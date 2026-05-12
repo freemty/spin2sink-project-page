@@ -1,0 +1,841 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>From a Spiral to a Sink — How Positional Encoding Shapes Attention Sinks in Diffusion Transformers</title>
+<meta name="description" content="We study attention sinks in Diffusion Transformers: how they form via Frequency-Aware Concentration, and how comma padding redistributes attention to improve generation.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='28' font-size='28'>🌀</text></svg>">
+<script>
+(function() {
+  var saved = localStorage.getItem('theme');
+  if (saved) document.documentElement.setAttribute('data-theme', saved);
+})();
+</script>
+<style>
+/* ===== VARIABLES ===== */
+:root {
+  --bg: #FFFFFF;
+  --bg-card: #FFFFFF;
+  --bg-code: #F5F5F5;
+  --text: #000000;
+  --text-secondary: #333333;
+  --text-tertiary: #666666;
+  --accent: #C6011F;
+  --accent-light: rgba(198, 1, 31, 0.08);
+  --border: #E0E0E0;
+  --border-light: #F0F0F0;
+  --font-display: 'EB Garamond', 'Georgia', serif;
+  --font-body: 'Inter', system-ui, -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Menlo', monospace;
+  --transition: 0.2s ease;
+  --max-width: 900px;
+}
+
+[data-theme="dark"] {
+  --bg: #0A0A0A;
+  --bg-card: #111111;
+  --bg-code: #1A1A1A;
+  --text: #F0F0F0;
+  --text-secondary: #B0B0B0;
+  --text-tertiary: #777777;
+  --accent: #E53935;
+  --accent-light: rgba(229, 57, 53, 0.1);
+  --border: #222222;
+  --border-light: #1A1A1A;
+}
+
+/* ===== RESET ===== */
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+html { scroll-behavior: smooth; -webkit-font-smoothing: antialiased; }
+body {
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.7;
+  color: var(--text);
+  background: var(--bg);
+}
+a { color: var(--text); text-decoration: none; transition: all var(--transition); }
+a:hover { color: var(--accent); }
+img { max-width: 100%; display: block; }
+::selection { background: rgba(198, 1, 31, 0.25); color: var(--text); }
+
+/* ===== NAV ===== */
+.nav {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+  background: rgba(255,255,255,0.92);
+  backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid transparent;
+  transition: border-color 0.3s ease;
+}
+[data-theme="dark"] .nav { background: rgba(10,10,10,0.92); }
+.nav.scrolled { border-bottom-color: var(--border); }
+.nav-inner {
+  max-width: var(--max-width); margin: 0 auto; padding: 0 32px;
+  height: 52px; display: flex; align-items: center; justify-content: space-between;
+}
+.nav-brand { font-family: var(--font-display); font-size: 16px; font-weight: 500; color: var(--text); }
+.nav-brand span { color: var(--accent); }
+.nav-links { display: flex; gap: 24px; align-items: center; }
+.nav-links a {
+  font-size: 12px; font-weight: 500; color: var(--text-tertiary);
+  letter-spacing: 0.04em;
+}
+.nav-links a:hover { color: var(--accent); text-decoration: none; }
+.theme-toggle {
+  background: none; border: none; cursor: pointer;
+  color: var(--text-tertiary); padding: 6px; font-size: 12px;
+  font-family: var(--font-body); letter-spacing: 0.04em;
+  transition: color var(--transition);
+}
+.theme-toggle:hover { color: var(--accent); }
+
+/* ===== LAYOUT ===== */
+.container { max-width: var(--max-width); margin: 0 auto; padding: 0 32px; }
+section { padding: 48px 0; scroll-margin-top: 60px; }
+
+/* ===== HERO ===== */
+.hero { padding: 80px 0 24px; text-align: center; }
+.hero h1 {
+  font-family: var(--font-display); font-size: 34px; font-weight: 400;
+  line-height: 1.25; letter-spacing: -0.01em; color: var(--text);
+  max-width: 760px; margin: 0 auto 16px;
+}
+.hero-venue {
+  display: inline-block; font-size: 13px; font-weight: 700;
+  background: var(--accent); color: #FFFFFF; padding: 3px 12px;
+  letter-spacing: 0.05em; margin-bottom: 20px;
+}
+.hero-authors {
+  font-size: 15px; color: var(--text-secondary);
+  line-height: 1.8; margin-bottom: 6px;
+}
+.hero-authors .me { color: var(--text); font-weight: 600; }
+.hero-authors a { text-decoration: underline; text-decoration-color: var(--border); text-underline-offset: 2px; }
+.hero-authors a:hover { text-decoration-color: var(--accent); }
+.hero-affil {
+  font-size: 13px; color: var(--text-tertiary);
+  margin-bottom: 20px; line-height: 1.6;
+}
+.hero-links { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-bottom: 0; }
+.hero-links a {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 7px 18px; font-size: 13px; font-weight: 500;
+  border: 1px solid var(--border); color: var(--text-secondary);
+  transition: all var(--transition);
+}
+.hero-links a:hover { border-color: var(--accent); color: var(--accent); text-decoration: none; }
+.hero-links a svg { width: 14px; height: 14px; flex-shrink: 0; }
+
+/* ===== SECTION HEADERS ===== */
+.section-header {
+  margin-bottom: 24px; padding-bottom: 10px;
+  border-bottom: 2px solid var(--text); position: relative;
+}
+.section-header h2 {
+  font-family: var(--font-display); font-size: 26px; font-weight: 400;
+  letter-spacing: -0.01em; color: var(--text);
+}
+.section-header::after {
+  content: ''; position: absolute; bottom: -2px; left: 0;
+  width: 32px; height: 2px; background: var(--accent);
+}
+
+/* ===== TEASER ===== */
+.teaser { padding: 32px 0; }
+.teaser-img {
+  border: 1px solid var(--border); border-radius: 4px; overflow: hidden;
+  margin-bottom: 12px;
+}
+.teaser-img img {
+  width: 100%;
+  filter: brightness(1.05) saturate(0.7) contrast(0.9);
+  transition: filter 0.4s ease;
+}
+[data-theme="dark"] .teaser-img img { filter: brightness(0.75); }
+.teaser-img:hover img { filter: brightness(1) saturate(1) contrast(1) !important; }
+.teaser-caption {
+  font-size: 13px; color: var(--text-tertiary); line-height: 1.6; text-align: center;
+}
+.teaser-caption strong { color: var(--text-secondary); }
+
+/* ===== ABSTRACT ===== */
+.abstract-text {
+  font-size: 15px; line-height: 1.8; color: var(--text-secondary);
+}
+.highlight-box {
+  border-left: 3px solid var(--accent);
+  padding: 12px 16px; margin: 16px 0;
+  background: var(--accent-light);
+  font-size: 14px; line-height: 1.7;
+}
+.highlight-box strong { color: var(--text); }
+
+/* ===== MODEL TABLE ===== */
+.model-table { width: 100%; border-collapse: collapse; font-size: 14px; margin: 16px 0; }
+.model-table th {
+  text-align: left; font-weight: 600; font-size: 12px;
+  text-transform: uppercase; letter-spacing: 0.04em;
+  color: var(--text-tertiary); padding: 8px 12px;
+  border-bottom: 2px solid var(--text);
+}
+.model-table td {
+  padding: 10px 12px; border-bottom: 1px solid var(--border-light);
+  color: var(--text-secondary);
+}
+.model-table tr:hover td { background: var(--accent-light); }
+.model-table .peak { font-weight: 600; color: var(--text); font-variant-numeric: tabular-nums; }
+.model-table code {
+  font-family: var(--font-mono); font-size: 12px;
+  background: var(--bg-code); padding: 1px 6px; border-radius: 2px;
+}
+
+/* Global code style (outside tables too) */
+code {
+  font-family: var(--font-mono); font-size: 0.88em;
+  background: var(--bg-code); padding: 1px 5px; border-radius: 2px;
+}
+
+/* ===== FINDINGS ===== */
+.finding { padding: 40px 0; border-top: 1px solid var(--border); }
+.finding:first-child { border-top: none; }
+.finding-number {
+  font-family: var(--font-mono); font-size: 48px; font-weight: 700;
+  color: var(--border); line-height: 1; margin-bottom: 8px;
+}
+[data-theme="dark"] .finding-number { color: #2A2A2A; }
+.finding-question {
+  font-family: var(--font-display); font-size: 22px; font-weight: 500;
+  line-height: 1.3; color: var(--text); margin-bottom: 16px;
+}
+.finding-body { font-size: 14px; line-height: 1.8; color: var(--text-secondary); margin-bottom: 20px; }
+.finding-body strong { color: var(--text); font-weight: 600; }
+.finding-fig {
+  margin: 20px 0; border: 1px solid var(--border); border-radius: 4px;
+  overflow: hidden; background: var(--bg-card);
+}
+.finding-fig img {
+  width: 100%; display: block;
+  filter: brightness(1.05) saturate(0.7) contrast(0.9);
+  transition: filter 0.4s ease;
+}
+[data-theme="dark"] .finding-fig img { filter: brightness(0.7); }
+.finding-fig:hover img { filter: brightness(1) saturate(1) contrast(1) !important; }
+.finding-fig figcaption {
+  font-size: 12px; color: var(--text-tertiary); padding: 10px 14px;
+  line-height: 1.6; border-top: 1px solid var(--border-light);
+}
+.finding-fig figcaption strong { color: var(--text-secondary); }
+.insight-box {
+  display: flex; align-items: baseline; gap: 10px;
+  padding: 10px 14px; margin: 16px 0 0;
+  border-left: 2px solid var(--accent);
+  font-size: 13px; font-style: italic;
+  color: var(--text-secondary);
+}
+.insight-box::before {
+  content: '→'; font-style: normal; color: var(--accent);
+  font-weight: 600; flex-shrink: 0;
+}
+.fig-row {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 16px;
+}
+.fig-row.three { grid-template-columns: 1fr 1fr 1fr; }
+
+/* ===== RESULTS TABLE ===== */
+.results-table { width: 100%; border-collapse: collapse; font-size: 14px; margin: 16px 0; }
+.results-table th {
+  text-align: left; font-weight: 600; font-size: 12px;
+  text-transform: uppercase; letter-spacing: 0.04em;
+  color: var(--text-tertiary); padding: 8px 12px;
+  border-bottom: 2px solid var(--text);
+}
+.results-table td {
+  padding: 8px 12px; border-bottom: 1px solid var(--border-light);
+  color: var(--text-secondary); font-variant-numeric: tabular-nums;
+}
+.results-table .positive { color: var(--accent); font-weight: 600; }
+
+/* ===== GALLERY ===== */
+.gallery-grid {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 2px;
+}
+.gallery-pair { position: relative; overflow: hidden; border-radius: 2px; cursor: pointer; }
+.gallery-pair img {
+  width: 100%; display: block; transition: opacity 0.3s ease;
+  object-fit: cover;
+}
+.gallery-pair .overlay {
+  position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+  opacity: 0; transition: opacity 0.3s ease;
+}
+.gallery-pair:hover .overlay, .gallery-pair.toggled .overlay { opacity: 1; }
+.gallery-pair:hover .base, .gallery-pair.toggled .base { opacity: 0; }
+.gallery-pair:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.gallery-label {
+  position: absolute; bottom: 6px; right: 6px;
+  font-size: 10px; font-weight: 600; letter-spacing: 0.05em;
+  padding: 2px 8px; background: rgba(0,0,0,0.7); color: #fff;
+  transition: background 0.2s ease;
+}
+.gallery-label.active { background: var(--accent); }
+.gallery-prompt {
+  grid-column: span 1; font-size: 11px; color: var(--text-tertiary);
+  line-height: 1.5; padding: 8px 4px; text-align: center; font-style: italic;
+}
+.gallery-prompt strong { color: var(--text-secondary); font-weight: 600; }
+
+/* ===== BIBTEX ===== */
+.bibtex-block {
+  position: relative; background: var(--bg-code);
+  border: 1px solid var(--border); border-radius: 4px;
+  padding: 16px 20px; font-family: var(--font-mono);
+  font-size: 12px; line-height: 1.7; overflow-x: auto;
+  color: var(--text-secondary);
+}
+.bibtex-block pre { margin: 0; }
+.bibtex-copy {
+  position: absolute; top: 8px; right: 8px;
+  background: var(--bg); border: 1px solid var(--border);
+  padding: 4px 12px; font-size: 11px; font-weight: 500;
+  cursor: pointer; font-family: var(--font-body);
+  color: var(--text-tertiary); transition: all var(--transition);
+}
+.bibtex-copy:hover { border-color: var(--accent); color: var(--accent); }
+
+/* ===== FOOTER ===== */
+.footer {
+  padding: 40px 0; border-top: 1px solid var(--border);
+  text-align: center;
+}
+.footer p { font-size: 12px; color: var(--text-tertiary); }
+.footer a { color: var(--text-tertiary); }
+.footer a:hover { color: var(--accent); }
+
+/* ===== FADE IN ===== */
+.fade-in {
+  opacity: 0; transform: translateY(12px);
+  transition: opacity 0.5s ease, transform 0.5s ease;
+}
+.fade-in.visible { opacity: 1; transform: translateY(0); }
+
+/* ===== RESPONSIVE ===== */
+@media (max-width: 768px) {
+  .container { padding: 0 20px; }
+  .nav-inner { padding: 0 20px; }
+  .nav-links { gap: 14px; }
+  .nav-links a { font-size: 11px; }
+  .hero { padding: 70px 0 20px; }
+  .hero h1 { font-size: 26px; }
+  .hero-authors { font-size: 14px; }
+  .fig-row { grid-template-columns: 1fr; }
+  .fig-row.three { grid-template-columns: 1fr; }
+  .gallery-grid { grid-template-columns: repeat(3, 1fr); }
+  .gallery-prompt-row { display: none !important; }
+  .gallery-pair .gallery-label { font-size: 8px; padding: 1px 5px; }
+  .finding-number { font-size: 36px; }
+  .finding-question { font-size: 19px; }
+}
+
+@media (max-width: 480px) {
+  .container { padding: 0 16px; }
+  .hero h1 { font-size: 22px; }
+  .hero-links a { padding: 6px 12px; font-size: 12px; }
+  .nav-inner { height: 48px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fade-in { opacity: 1; transform: none; transition: none; }
+  html { scroll-behavior: auto; }
+}
+</style>
+</head>
+<body>
+
+<!-- ===== NAV ===== -->
+<nav class="nav" id="nav">
+  <div class="nav-inner">
+    <a class="nav-brand" href="#">Spiral<span>→</span>Sink</a>
+    <div class="nav-links">
+      <a href="#abstract">Abstract</a>
+      <a href="#findings">Findings</a>
+      <a href="#application">Application</a>
+      <a href="#bibtex">BibTeX</a>
+      <button class="theme-toggle" onclick="toggleTheme()" aria-label="Toggle light/dark theme">light/dark</button>
+    </div>
+  </div>
+</nav>
+
+<!-- ===== HERO ===== -->
+<section class="hero">
+  <div class="container">
+    <h1 class="fade-in">From a Spiral to a Sink: How Positional Encoding Shapes Attention Sinks in Diffusion Transformers</h1>
+    <div class="hero-venue fade-in">NeurIPS 2026</div>
+    <div class="hero-authors fade-in">
+      <span class="me">Yuanbo Yang</span><sup>1</sup>,
+      <a href="#">Yiyi Liao</a><sup>1†</sup>,
+      <a href="#">Jun Gao</a><sup>2</sup>
+    </div>
+    <div class="hero-affil fade-in">
+      <sup>1</sup>Zhejiang University &nbsp;&nbsp; <sup>2</sup>University of Toronto &nbsp;&nbsp; <sup>†</sup>Corresponding author
+    </div>
+    <div class="hero-links fade-in">
+      <a href="#" onclick="return false;" style="opacity:0.5;cursor:default;" title="Coming soon" aria-disabled="true" tabindex="-1">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+        Paper
+      </a>
+      <a href="#" onclick="return false;" style="opacity:0.5;cursor:default;" title="Coming soon" aria-disabled="true" tabindex="-1">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"/></svg>
+        arXiv
+      </a>
+      <a href="#" onclick="return false;" style="opacity:0.5;cursor:default;" title="Coming soon" aria-disabled="true" tabindex="-1">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 00-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0020 4.77 5.07 5.07 0 0019.91 1S18.73.65 16 2.48a13.38 13.38 0 00-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 005 4.77a5.44 5.44 0 00-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 009 18.13V22"/></svg>
+        Code
+      </a>
+    </div>
+  </div>
+</section>
+
+<!-- ===== TEASER ===== -->
+<section class="teaser" id="teaser">
+  <div class="container">
+    <figure class="teaser-img fade-in">
+      <img src="assets/figures/teaser_2x2.png" alt="Attention heatmaps from FLUX.1 showing sink tokens as bright vertical columns" fetchpriority="high">
+    </figure>
+    <p class="teaser-caption fade-in">
+      <strong>Figure 1.</strong> Attention maps from FLUX.1 at different layers and denoising steps. Bright vertical columns indicate <em>attention sinks</em> — tokens that monopolize attention regardless of content. These sinks appear in the deeper layers and persist throughout generation.
+    </p>
+  </div>
+</section>
+
+<!-- ===== ABSTRACT ===== -->
+<section id="abstract">
+  <div class="container">
+    <div class="section-header fade-in"><h2>Abstract</h2></div>
+    <div class="abstract-text fade-in">
+      <p>
+        We study the <em>attention sink</em> phenomenon — where a few tokens monopolize attention regardless of content — in Diffusion Transformers (DiTs). This has been widely studied in large language models but remains underexplored in DiTs, whose architectural differences prevent existing explanations from directly transferring.
+      </p>
+      <div class="highlight-box">
+        <strong>Finding 1 — Universal:</strong> Sinks appear in all six architectures we study. They form early in denoising, persist throughout, and concentrate in the deeper half of the network.
+      </div>
+      <div class="highlight-box">
+        <strong>Finding 2 — Mechanism:</strong> In RoPE-based models, sink tokens concentrate Key energy in low-frequency channels that do not decay with distance (<strong>Frequency-Aware Concentration</strong>). In AbsPE models, learned embeddings at corner positions directly create sinks.
+      </div>
+      <div class="highlight-box">
+        <strong>Finding 3 — Practical fix:</strong> In FLUX.1, padding tokens become sinks and absorb over half of total attention. Replacing padding with commas redistributes the budget and improves compositional generation without retraining.
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== MODEL COVERAGE ===== -->
+<section id="models">
+  <div class="container">
+    <div class="section-header fade-in"><h2>Models Studied</h2></div>
+    <p class="fade-in" style="font-size:14px; color:var(--text-secondary); margin-bottom:16px;">
+      Six DiT architectures spanning three PE types and two attention designs.
+    </p>
+    <div class="fade-in" style="overflow-x:auto;">
+      <table class="model-table">
+        <thead>
+          <tr>
+            <th>Model</th>
+            <th>PE Type</th>
+            <th>Sink Region</th>
+            <th>Peak Ratio</th>
+            <th>Unique Sinks</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>PixArt-&alpha;</td>
+            <td><code>AbsPE</code></td>
+            <td>Spatial corners</td>
+            <td class="peak">85&times;</td>
+            <td>20</td>
+          </tr>
+          <tr>
+            <td>FLUX.1</td>
+            <td><code>2D RoPE</code></td>
+            <td>Text <code>&lt;PAD&gt;</code></td>
+            <td class="peak">214&times;</td>
+            <td>7</td>
+          </tr>
+          <tr>
+            <td>Qwen-Image</td>
+            <td><code>2D RoPE</code></td>
+            <td>Text tokens</td>
+            <td class="peak">240&times;</td>
+            <td>7</td>
+          </tr>
+          <tr>
+            <td>Z-Image</td>
+            <td><code>3D RoPE</code></td>
+            <td>Text <code>&lt;PAD&gt;</code></td>
+            <td class="peak">212&times;</td>
+            <td>5</td>
+          </tr>
+          <tr>
+            <td>Wan2.1</td>
+            <td><code>3D RoPE</code></td>
+            <td>1st-frame patches</td>
+            <td class="peak">477&times;</td>
+            <td>48</td>
+          </tr>
+          <tr>
+            <td>LTX Video</td>
+            <td><code>3D RoPE</code></td>
+            <td>1st-frame patches</td>
+            <td class="peak">65&times;</td>
+            <td>91</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="fade-in" style="font-size:12px; color:var(--text-tertiary); margin-top:8px;">
+      Peak = max sink-to-random &mu;<sub>k</sub> ratio across all layers. Unique = number of distinct top-1 sink tokens across &ge;100 prompts (low = deterministic, high = stochastic).
+    </p>
+  </div>
+</section>
+
+<!-- ===== KEY FINDINGS ===== -->
+<section id="findings">
+  <div class="container">
+    <div class="section-header fade-in"><h2>Key Findings</h2></div>
+
+    <!-- Finding 01 -->
+    <div class="finding fade-in">
+      <div class="finding-number" aria-hidden="true">01</div>
+      <h3 class="finding-question">When and where do sinks emerge?</h3>
+      <div class="finding-body">
+        <p>We track sink strength along two axes: denoising progress and network depth. All three representative models develop sinks within the first few steps. <strong>FLUX.1</strong> shows high Key Importance from step 1; <strong>PixArt</strong> locks onto a fixed sink around step 6; <strong>Wan</strong> grows exponentially over the first 20 steps.</p>
+        <p style="margin-top:10px;">Across layers, a sharp transition occurs in the second half of the network: attention concentrates onto a few tokens, reaching <strong>85&times;</strong> (PixArt), <strong>214&times;</strong> (FLUX.1), and <strong>477&times;</strong> (Wan) at peak. Shallow layers show uniform attention.</p>
+      </div>
+      <figure class="finding-fig">
+        <img src="assets/figures/fig_when_where_optionC.png" alt="When and where sinks emerge — Key Importance over denoising steps and layer depth" loading="lazy">
+        <figcaption><strong>Figure 2.</strong> (a) Top-1 Key Importance at each denoising step: all models develop sinks early. Shaded bands = &plusmn;1 std across 100 prompts. (b) Sink-to-random ratio at each layer: shallow layers show no sink; deep layers reach up to 477&times; concentration.</figcaption>
+      </figure>
+      <div class="insight-box">Sinks are intrinsic to model weights, not driven by any particular input. Once formed, they persist regardless of prompt or noise seed.</div>
+    </div>
+
+    <!-- Finding 02 -->
+    <div class="finding fade-in">
+      <div class="finding-number" aria-hidden="true">02</div>
+      <h3 class="finding-question">Which tokens become sinks?</h3>
+      <div class="finding-body">
+        <p>The sink identity is determined by the positional encoding type. In <strong>AbsPE</strong> models (PixArt-&alpha;), sinks are corner tokens whose learned embedding has extreme coordinate values. In <strong>2D RoPE</strong> models (FLUX.1, Z-Image, Qwen-Image), sinks land on text <code>&lt;PAD&gt;</code> tokens. In <strong>3D RoPE</strong> video models (Wan2.1, LTX Video), sinks cluster on first-frame patches.</p>
+        <p style="margin-top:10px;">Across all PE types, sink tokens share two properties: they occupy <strong>stable positions</strong> (present in every forward pass) and carry <strong>minimal content</strong> (not directly supervised by the training loss).</p>
+      </div>
+      <figure class="finding-fig">
+        <img src="assets/figures/key_importance.png" alt="Key Importance per token for four DiTs — showing which tokens become sinks" loading="lazy">
+        <figcaption><strong>Figure 3.</strong> Key Importance &mu;<sub>k</sub> at the final denoising step for four DiTs. Tall bars = tokens receiving 100&ndash;200&times; more attention. <strong>PixArt:</strong> corner token. <strong>FLUX.1:</strong> &lt;PAD&gt; tokens. <strong>Wan2.1:</strong> first-frame patches. <strong>LTX Video:</strong> similar first-frame pattern.</figcaption>
+      </figure>
+      <div class="insight-box">The emptier the content, the stronger the sink. DiTs repurpose whichever tokens the positional encoding makes available as implicit registers.</div>
+    </div>
+
+    <!-- Finding 03 -->
+    <div class="finding fade-in">
+      <div class="finding-number" aria-hidden="true">03</div>
+      <h3 class="finding-question">Can massive activations explain sinks?</h3>
+      <div class="finding-body">
+        <p>In LLMs, attention sinks co-occur with <em>massive activations</em> — outlier hidden-state dimensions that appear in the same tokens. We observe the same co-occurrence in DiTs: sink tokens exhibit activation spikes <strong>~50&times;</strong> above average.</p>
+        <p style="margin-top:10px;">However, DiTs typically apply <strong>QK-Normalization</strong>, which projects all Key vectors to the same &ell;<sub>2</sub>-norm. After normalization, sink and non-sink tokens have identical Key magnitudes. The cause must lie in the <em>direction</em> of the Key vectors rather than their magnitude.</p>
+      </div>
+      <div class="fig-row">
+        <figure class="finding-fig">
+          <img src="assets/figures/fig_sink_anatomy_3d_clean.png" alt="3D line plots showing massive activations in sink tokens vs normal tokens" loading="lazy">
+          <figcaption><strong>Figure 4.</strong> Layer input (left): sink tokens show 50&times; activation spikes. Key vectors (right): after QK-Norm, all norms are equal (~15.9).</figcaption>
+        </figure>
+        <figure class="finding-fig">
+          <img src="assets/figures/fig_massact_sink_cooccurrence.png" alt="Co-occurrence of massive activations and attention sinks across layers" loading="lazy">
+          <figcaption><strong>Figure 5.</strong> Massive activations (red) peak near depth 0.3; attention sinks (blue) emerge afterward in deeper layers.</figcaption>
+        </figure>
+      </div>
+      <div class="insight-box">QK-Normalization equalizes Key norms — the cause of attention dominance lies in Key direction, not magnitude.</div>
+    </div>
+
+    <!-- Finding 04 -->
+    <div class="finding fade-in">
+      <div class="finding-number" aria-hidden="true">04</div>
+      <h3 class="finding-question">How does RoPE create sinks?</h3>
+      <div class="finding-body">
+        <p>RoPE is the only operation between QK-Normalization and the dot product. We compute the mean &langle;q, k&rangle; for a sink key versus a random image key, before and after RoPE:</p>
+        <p style="margin-top:10px;"><strong>Pre-RoPE:</strong> both keys score similarly (123 vs 134) — no sink would form. <strong>Post-RoPE:</strong> the sink key retains its score (112) while the random key drops to &minus;62. RoPE does not boost the sink; it <em>suppresses non-sink keys</em> by rotating their channels in ways that reduce dot products with distant queries.</p>
+      </div>
+      <figure class="finding-fig">
+        <img src="assets/figures/dit_attention_block.png" alt="DiT attention block diagram showing pre/post RoPE dot products" loading="lazy">
+        <figcaption><strong>Figure 6.</strong> Left: signal flow in a DiT attention block. Right: mean QK dot product for a sink key vs. a random key, before and after RoPE (FLUX.1, layer 28, step 27). Pre-RoPE scores are comparable; post-RoPE, only the sink survives.</figcaption>
+      </figure>
+      <div class="insight-box">RoPE does not boost the sink — it suppresses non-sink keys. Sink keys survive because their energy distribution is immune to the rotation.</div>
+    </div>
+
+    <!-- Finding 05 -->
+    <div class="finding fade-in">
+      <div class="finding-number" aria-hidden="true">05</div>
+      <h3 class="finding-question">What is Frequency-Aware Concentration?</h3>
+      <div class="finding-body">
+        <p>RoPE assigns each channel pair a rotation frequency &theta;<sub>c</sub>. High-frequency channels rotate rapidly and their contributions cancel out for distant tokens. Low-frequency channels barely rotate: cos(&Delta;&theta;<sub>c</sub>) &asymp; 1 regardless of distance — a <strong>"Safe Harbor"</strong>.</p>
+        <p style="margin-top:10px;">Sink keys concentrate the majority of their energy into these low-frequency channels, while normal keys spread energy uniformly and lose it to high-frequency cancellation. We call this <strong>Frequency-Aware Concentration (FAC)</strong>. It deepens with layer depth, reaching &gt;200&times; attention gap in the deepest layers. On the Value side, sink tokens carry near-zero magnitudes — they absorb attention without adding signal.</p>
+      </div>
+      <figure class="finding-fig">
+        <img src="assets/figures/fig_fac_compact_smooth.png" alt="FAC mechanism: cosine heatmap and per-channel Key energy" loading="lazy">
+        <figcaption><strong>Figure 7.</strong> (a) Per-channel cos(&theta;<sub>c</sub>&middot;&Delta;): high-freq channels (top) decay rapidly; low-freq "Safe Harbor" channels (bottom) stay near 1. (b) Per-channel Key energy: sink keys (pink) concentrate in low-freq; normal keys (gray) spread uniformly.</figcaption>
+      </figure>
+      <figure class="finding-fig">
+        <img src="assets/figures/fig_same_norm_diff_dist.png" alt="2x3 heatmap showing FAC deepening across layers and near-zero sink Values" loading="lazy">
+        <figcaption><strong>Figure 8.</strong> FAC deepens with layer depth. Top row: Sink Key energy shifts to low-freq channels; attention gap grows to &gt;200&times;. Bottom row: Sink Value channels go to near-zero — sinks absorb attention without adding signal ("no-op" targets).</figcaption>
+      </figure>
+      <div class="insight-box">Sink keys survive by placing energy in "Safe Harbor" channels where rotation barely changes. They win by surviving, not by dominating.</div>
+    </div>
+
+    <!-- Finding 06 -->
+    <div class="finding fade-in">
+      <div class="finding-number" aria-hidden="true">06</div>
+      <h3 class="finding-question">How does PE type determine sink selection?</h3>
+      <div class="finding-body">
+        <p>FAC explains <em>how</em> a token wins attention, but <em>which</em> tokens acquire this advantage depends on the PE type:</p>
+        <p style="margin-top:10px;"><strong>RoPE models:</strong> semantically empty tokens (<code>&lt;PAD&gt;</code>, <code>&lt;EOS&gt;</code>) that carry no content become sinks. In FLUX.1, <code>&lt;EOS&gt;</code> receives 1165&times; uniform attention, <code>&lt;PAD&gt;</code> 117&times;, commas only 29&times;.</p>
+        <p style="margin-top:8px;"><strong>AbsPE models:</strong> the learned positional embedding itself controls sink identity. We verify this causally: zeroing the corner PE and copying it to 20 positions arranged in a smiley-face pattern redirects attention to those positions (8.6&times; higher &mu;<sub>k</sub>).</p>
+      </div>
+      <div class="fig-row">
+        <figure class="finding-fig">
+          <img src="assets/figures/fig_token_selection_bars.png" alt="FLUX.1 attention by token type: EOS > PAD > comma > image" loading="lazy">
+          <figcaption><strong>Figure 9a.</strong> FLUX.1 (RoPE): semantically empty tokens attract far more attention. Same positions, same seed — only token content changes.</figcaption>
+        </figure>
+        <figure class="finding-fig">
+          <img src="assets/figures/fig_ape_sink_control_v2.png" alt="PixArt PE manipulation — smiley face pattern in attention" loading="lazy">
+          <figcaption><strong>Figure 9b.</strong> PixArt (AbsPE): copying the corner PE to a smiley-face pattern redirects attention. The positional embedding alone controls which tokens become sinks.</figcaption>
+        </figure>
+      </div>
+      <div class="insight-box">In RoPE models, content determines sink strength. In AbsPE models, position determines it. Both types share the same principle: stable, empty positions become sinks.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== APPLICATION ===== -->
+<section id="application">
+  <div class="container">
+    <div class="section-header fade-in"><h2>Application: Redistributing Attention via Comma Padding</h2></div>
+
+    <div class="finding-body fade-in">
+      <p>FLUX.1 uses a T5 encoder that packs every prompt into a fixed 512-token sequence. A typical short prompt fills ~17 slots; the remaining ~494 are <code>&lt;PAD&gt;</code> tokens. These empty tokens satisfy the FAC condition and become strong sinks: <strong><code>&lt;PAD&gt;</code> tokens collectively absorb 55% of the total attention budget</strong>, while the 4,096 image tokens (89% of the sequence) receive only 22%.</p>
+      <p style="margin-top:12px;">Since comma tokens attract only 29&times; uniform attention versus 117&times; for <code>&lt;PAD&gt;</code>, simply <strong>appending 200 commas to the prompt</strong> displaces most padding tokens and redistributes attention toward image tokens. No retraining or architectural change is needed.</p>
+    </div>
+
+    <figure class="finding-fig fade-in">
+      <img src="assets/figures/puppy_attention_budget.png" alt="Attention budget of FLUX.1 — top-32 tokens ranked by Key Importance" loading="lazy">
+      <figcaption><strong>Figure 10.</strong> Attention budget of FLUX.1: Top-32 tokens ranked by mean &mu;<sub>k</sub> (N=100 prompts). <span style="color:var(--accent);font-weight:600;">&lt;EOS&gt;</span> dominates; 22 of 32 are <strong>&lt;PAD&gt;</strong>. Empty tokens absorb 55% of total attention; image tokens (89% of sequence) get only 22%.</figcaption>
+    </figure>
+
+    <!-- Results table -->
+    <div class="fade-in" style="margin-top:32px;">
+      <h3 style="font-family:var(--font-display); font-size:20px; font-weight:500; margin-bottom:16px;">Quantitative Results</h3>
+      <p style="font-size:14px; color:var(--text-secondary); margin-bottom:12px;">
+        Evaluated on FLUX.1-dev (12 steps, 1024&sup2;, guidance 3.5). Comma padding improves compositional categories while maintaining general quality (TIIF overall: 66.8% &rarr; 67.7%).
+      </p>
+      <div style="overflow-x:auto;">
+        <table class="results-table">
+          <thead>
+            <tr>
+              <th>Benchmark</th>
+              <th>Category</th>
+              <th>Baseline</th>
+              <th>+Comma</th>
+              <th>Diff</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Concept Mixing</td>
+              <td>Conflicting concepts</td>
+              <td>3.65</td>
+              <td>4.55</td>
+              <td class="positive">+0.90</td>
+            </tr>
+            <tr>
+              <td>Concept Mixing</td>
+              <td>Hybrid fusion</td>
+              <td>4.37</td>
+              <td>5.71</td>
+              <td class="positive">+1.34</td>
+            </tr>
+            <tr>
+              <td>TIIF-Bench</td>
+              <td>Diff. + texture</td>
+              <td>43.0%</td>
+              <td>50.5%</td>
+              <td class="positive">+7.5%</td>
+            </tr>
+            <tr>
+              <td>TIIF-Bench</td>
+              <td>Comparison</td>
+              <td>55.6%</td>
+              <td>61.6%</td>
+              <td class="positive">+6.0%</td>
+            </tr>
+            <tr>
+              <td>TIIF-Bench</td>
+              <td>Action + 2D</td>
+              <td>80.4%</td>
+              <td>86.0%</td>
+              <td class="positive">+5.6%</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="font-size:12px; color:var(--text-tertiary); margin-top:8px;">
+        CM = GPT-scored alignment (0&ndash;10). TIIF = VQA accuracy. Trade-off: aesthetic scores decrease ~19% on Concept Mixing (comma padding shifts the alignment&ndash;aesthetics frontier).
+      </p>
+    </div>
+
+    <!-- Gallery -->
+    <div class="fade-in" style="margin-top:40px;">
+      <h3 style="font-family:var(--font-display); font-size:20px; font-weight:500; margin-bottom:16px;">Qualitative Comparison</h3>
+      <p style="font-size:13px; color:var(--text-tertiary); margin-bottom:16px;">Hover to see the <strong style="color:var(--text-secondary);">+Comma</strong> result. Same model weights, same seeds — only the prompt suffix differs.</p>
+
+      <!-- Prompt labels -->
+      <div class="gallery-prompt-row" style="display:grid; grid-template-columns:repeat(3,1fr); gap:2px; margin-bottom:4px;">
+        <div class="gallery-prompt">"A <strong>pyramid</strong> built inside a modern <strong>stadium</strong>"</div>
+        <div class="gallery-prompt">"An <strong>astronaut</strong> riding a horse on a tennis court watching a <strong>shark</strong> flying..."</div>
+        <div class="gallery-prompt">"A <strong>puppy</strong> living inside a computer <strong>screen</strong> displaying a <strong>cat</strong>..."</div>
+      </div>
+
+      <!-- Row 1: seed A -->
+      <div class="gallery-grid" style="margin-bottom:2px;">
+        <div class="gallery-pair">
+          <img class="base" src="assets/figures/gallery/pyramid_bl_s40.jpg" alt="Pyramid baseline seed 40" loading="lazy">
+          <img class="overlay" src="assets/figures/gallery/pyramid_comma_s40.jpg" alt="Pyramid +comma seed 40" loading="lazy">
+          <div class="gallery-label baseline-label">Baseline</div>
+        </div>
+        <div class="gallery-pair">
+          <img class="base" src="assets/figures/gallery/astronaut_bl_s40.jpg" alt="Astronaut baseline seed 40" loading="lazy">
+          <img class="overlay" src="assets/figures/gallery/astronaut_comma_s40.jpg" alt="Astronaut +comma seed 40" loading="lazy">
+          <div class="gallery-label baseline-label">Baseline</div>
+        </div>
+        <div class="gallery-pair">
+          <img class="base" src="assets/figures/gallery/puppy_bl_s42.jpg" alt="Puppy baseline seed 42" loading="lazy">
+          <img class="overlay" src="assets/figures/gallery/puppy_comma_s42.jpg" alt="Puppy +comma seed 42" loading="lazy">
+          <div class="gallery-label baseline-label">Baseline</div>
+        </div>
+      </div>
+
+      <!-- Row 2: seed B -->
+      <div class="gallery-grid">
+        <div class="gallery-pair">
+          <img class="base" src="assets/figures/gallery/pyramid_bl_s41.jpg" alt="Pyramid baseline seed 41" loading="lazy">
+          <img class="overlay" src="assets/figures/gallery/pyramid_comma_s41.jpg" alt="Pyramid +comma seed 41" loading="lazy">
+          <div class="gallery-label baseline-label">Baseline</div>
+        </div>
+        <div class="gallery-pair">
+          <img class="base" src="assets/figures/gallery/astronaut_bl_s42.jpg" alt="Astronaut baseline seed 42" loading="lazy">
+          <img class="overlay" src="assets/figures/gallery/astronaut_comma_s42.jpg" alt="Astronaut +comma seed 42" loading="lazy">
+          <div class="gallery-label baseline-label">Baseline</div>
+        </div>
+        <div class="gallery-pair">
+          <img class="base" src="assets/figures/gallery/puppy_bl_s43.jpg" alt="Puppy baseline seed 43" loading="lazy">
+          <img class="overlay" src="assets/figures/gallery/puppy_comma_s43.jpg" alt="Puppy +comma seed 43" loading="lazy">
+          <div class="gallery-label baseline-label">Baseline</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== BIBTEX ===== -->
+<section id="bibtex">
+  <div class="container">
+    <div class="section-header fade-in"><h2>BibTeX</h2></div>
+    <div class="bibtex-block fade-in">
+      <button class="bibtex-copy" onclick="copyBibtex()">Copy</button>
+<pre id="bibtex-text">@inproceedings{yang2026spiral2sink,
+  title     = {From a Spiral to a Sink: How Positional Encoding
+               Shapes Attention Sinks in Diffusion Transformers},
+  author    = {Yang, Yuanbo and Liao, Yiyi and Gao, Jun},
+  booktitle = {Advances in Neural Information Processing Systems (NeurIPS)},
+  year      = {2026}
+}</pre>
+    </div>
+  </div>
+</section>
+
+<!-- ===== FOOTER ===== -->
+<footer class="footer">
+  <div class="container">
+    <p>
+      <span style="font-family:var(--font-display);font-size:16px;font-weight:500;">Y<span style="color:var(--accent);">.</span></span>
+      &nbsp;&middot;&nbsp;
+      Yuanbo Yang &middot; Zhejiang University &middot; University of Toronto
+    </p>
+  </div>
+</footer>
+
+<script>
+// Theme toggle
+function toggleTheme() {
+  const html = document.documentElement;
+  const next = html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+  html.setAttribute('data-theme', next);
+  localStorage.setItem('theme', next);
+}
+// Theme init moved to <head> to prevent FOUC
+
+// Nav scroll effect
+const nav = document.getElementById('nav');
+window.addEventListener('scroll', () => {
+  nav.classList.toggle('scrolled', window.scrollY > 20);
+});
+
+// Fade-in on scroll
+const observer = new IntersectionObserver((entries) => {
+  entries.forEach(entry => {
+    if (entry.isIntersecting) {
+      entry.target.classList.add('visible');
+      observer.unobserve(entry.target);
+    }
+  });
+}, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+document.querySelectorAll('.fade-in').forEach(el => observer.observe(el));
+
+// Gallery hover + click/tap toggle
+document.querySelectorAll('.gallery-pair').forEach(pair => {
+  const label = pair.querySelector('.gallery-label');
+  if (!label) return;
+  pair.setAttribute('tabindex', '0');
+  pair.setAttribute('role', 'button');
+  pair.setAttribute('aria-label', 'Toggle baseline / +Comma comparison');
+
+  function showComma() { label.textContent = '+Comma'; label.classList.add('active'); }
+  function showBase() { label.textContent = 'Baseline'; label.classList.remove('active'); }
+
+  pair.addEventListener('mouseenter', showComma);
+  pair.addEventListener('mouseleave', showBase);
+
+  pair.addEventListener('click', () => {
+    pair.classList.toggle('toggled');
+    pair.classList.contains('toggled') ? showComma() : showBase();
+  });
+  pair.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); pair.click(); }
+  });
+});
+
+// Copy BibTeX
+function copyBibtex() {
+  const text = document.getElementById('bibtex-text').textContent;
+  const btn = document.querySelector('.bibtex-copy');
+  navigator.clipboard.writeText(text).then(() => {
+    btn.textContent = 'Copied!';
+    setTimeout(() => { btn.textContent = 'Copy'; }, 2000);
+  }).catch(() => {
+    btn.textContent = 'Failed';
+    setTimeout(() => { btn.textContent = 'Copy'; }, 2000);
+  });
+}
+</script>
+</body>
+</html>
