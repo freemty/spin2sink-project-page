@@ -150,13 +150,8 @@ section { padding: 48px 0; scroll-margin-top: 60px; }
   border: 1px solid var(--border); border-radius: 4px; overflow: hidden;
   margin-bottom: 12px;
 }
-.teaser-img img {
-  width: 100%;
-  filter: brightness(1.05) saturate(0.7) contrast(0.9);
-  transition: filter 0.4s ease;
-}
-[data-theme="dark"] .teaser-img img { filter: brightness(0.75); }
-.teaser-img:hover img { filter: brightness(1) saturate(1) contrast(1) !important; }
+.teaser-img img { width: 100%; }
+.teaser-img .fig-img-wrap { background: #0A0A0A; padding: 8px; }
 .teaser-caption {
   font-size: 13px; color: var(--text-tertiary); line-height: 1.6; text-align: center;
 }
@@ -219,11 +214,11 @@ code {
 }
 .finding-fig img {
   width: 100%; display: block;
-  filter: brightness(1.05) saturate(0.7) contrast(0.9);
-  transition: filter 0.4s ease;
 }
-[data-theme="dark"] .finding-fig img { filter: brightness(0.7); }
-.finding-fig:hover img { filter: brightness(1) saturate(1) contrast(1) !important; }
+.finding-fig .fig-img-wrap {
+  background: #FFFFFF; padding: 8px;
+}
+[data-theme="dark"] .finding-fig .fig-img-wrap { background: #F8F8F8; }
 .finding-fig figcaption {
   font-size: 12px; color: var(--text-tertiary); padding: 10px 14px;
   line-height: 1.6; border-top: 1px solid var(--border-light);
@@ -403,7 +398,7 @@ code {
 <section class="teaser" id="teaser">
   <div class="container">
     <figure class="teaser-img fade-in">
-      <img src="assets/figures/teaser_2x2.png" alt="Attention heatmaps from FLUX.1 showing sink tokens as bright vertical columns" fetchpriority="high">
+      <div class="fig-img-wrap"><img src="assets/figures/teaser_2x2.png" alt="Attention heatmaps from FLUX.1 showing sink tokens as bright vertical columns" fetchpriority="high"></div>
     </figure>
     <p class="teaser-caption fade-in">
       <strong>Figure 1.</strong> Attention maps from FLUX.1 at different layers and denoising steps. Bright vertical columns indicate <em>attention sinks</em> — tokens that monopolize attention regardless of content. These sinks appear in the deeper layers and persist throughout generation.
@@ -516,7 +511,7 @@ code {
         <p style="margin-top:10px;">Across layers, a sharp transition occurs in the second half of the network: attention concentrates onto a few tokens, reaching <strong>85&times;</strong> (PixArt), <strong>214&times;</strong> (FLUX.1), and <strong>477&times;</strong> (Wan) at peak. Shallow layers show uniform attention.</p>
       </div>
       <figure class="finding-fig">
-        <img src="assets/figures/fig_when_where_optionC.png" alt="When and where sinks emerge — Key Importance over denoising steps and layer depth" loading="lazy">
+        <div class="fig-img-wrap"><img src="assets/figures/fig_when_where_optionC.png" alt="When and where sinks emerge — Key Importance over denoising steps and layer depth" loading="lazy"></div>
         <figcaption><strong>Figure 2.</strong> (a) Top-1 Key Importance at each denoising step: all models develop sinks early. Shaded bands = &plusmn;1 std across 100 prompts. (b) Sink-to-random ratio at each layer: shallow layers show no sink; deep layers reach up to 477&times; concentration.</figcaption>
       </figure>
       <div class="insight-box">Sinks are intrinsic to model weights, not driven by any particular input. Once formed, they persist regardless of prompt or noise seed.</div>
@@ -531,7 +526,7 @@ code {
         <p style="margin-top:10px;">Across all PE types, sink tokens share two properties: they occupy <strong>stable positions</strong> (present in every forward pass) and carry <strong>minimal content</strong> (not directly supervised by the training loss).</p>
       </div>
       <figure class="finding-fig">
-        <img src="assets/figures/key_importance.png" alt="Key Importance per token for four DiTs — showing which tokens become sinks" loading="lazy">
+        <div class="fig-img-wrap"><img src="assets/figures/key_importance.png" alt="Key Importance per token for four DiTs — showing which tokens become sinks" loading="lazy"></div>
         <figcaption><strong>Figure 3.</strong> Key Importance &mu;<sub>k</sub> at the final denoising step for four DiTs. Tall bars = tokens receiving 100&ndash;200&times; more attention. <strong>PixArt:</strong> corner token. <strong>FLUX.1:</strong> &lt;PAD&gt; tokens. <strong>Wan2.1:</strong> first-frame patches. <strong>LTX Video:</strong> similar first-frame pattern.</figcaption>
       </figure>
       <div class="insight-box">The emptier the content, the stronger the sink. DiTs repurpose whichever tokens the positional encoding makes available as implicit registers.</div>
@@ -547,11 +542,11 @@ code {
       </div>
       <div class="fig-row">
         <figure class="finding-fig">
-          <img src="assets/figures/fig_sink_anatomy_3d_clean.png" alt="3D line plots showing massive activations in sink tokens vs normal tokens" loading="lazy">
+          <div class="fig-img-wrap"><img src="assets/figures/fig_sink_anatomy_3d_clean.png" alt="3D line plots showing massive activations in sink tokens vs normal tokens" loading="lazy"></div>
           <figcaption><strong>Figure 4.</strong> Layer input (left): sink tokens show 50&times; activation spikes. Key vectors (right): after QK-Norm, all norms are equal (~15.9).</figcaption>
         </figure>
         <figure class="finding-fig">
-          <img src="assets/figures/fig_massact_sink_cooccurrence.png" alt="Co-occurrence of massive activations and attention sinks across layers" loading="lazy">
+          <div class="fig-img-wrap"><img src="assets/figures/fig_massact_sink_cooccurrence.png" alt="Co-occurrence of massive activations and attention sinks across layers" loading="lazy"></div>
           <figcaption><strong>Figure 5.</strong> Massive activations (red) peak near depth 0.3; attention sinks (blue) emerge afterward in deeper layers.</figcaption>
         </figure>
       </div>
@@ -567,7 +562,7 @@ code {
         <p style="margin-top:10px;"><strong>Pre-RoPE:</strong> both keys score similarly (123 vs 134) — no sink would form. <strong>Post-RoPE:</strong> the sink key retains its score (112) while the random key drops to &minus;62. RoPE does not boost the sink; it <em>suppresses non-sink keys</em> by rotating their channels in ways that reduce dot products with distant queries.</p>
       </div>
       <figure class="finding-fig">
-        <img src="assets/figures/dit_attention_block.png" alt="DiT attention block diagram showing pre/post RoPE dot products" loading="lazy">
+        <div class="fig-img-wrap"><img src="assets/figures/dit_attention_block.png" alt="DiT attention block diagram showing pre/post RoPE dot products" loading="lazy"></div>
         <figcaption><strong>Figure 6.</strong> Left: signal flow in a DiT attention block. Right: mean QK dot product for a sink key vs. a random key, before and after RoPE (FLUX.1, layer 28, step 27). Pre-RoPE scores are comparable; post-RoPE, only the sink survives.</figcaption>
       </figure>
       <div class="insight-box">RoPE does not boost the sink — it suppresses non-sink keys. Sink keys survive because their energy distribution is immune to the rotation.</div>
@@ -582,11 +577,11 @@ code {
         <p style="margin-top:10px;">Sink keys concentrate the majority of their energy into these low-frequency channels, while normal keys spread energy uniformly and lose it to high-frequency cancellation. We call this <strong>Frequency-Aware Concentration (FAC)</strong>. It deepens with layer depth, reaching &gt;200&times; attention gap in the deepest layers. On the Value side, sink tokens carry near-zero magnitudes — they absorb attention without adding signal.</p>
       </div>
       <figure class="finding-fig">
-        <img src="assets/figures/fig_fac_compact_smooth.png" alt="FAC mechanism: cosine heatmap and per-channel Key energy" loading="lazy">
+        <div class="fig-img-wrap"><img src="assets/figures/fig_fac_compact_smooth.png" alt="FAC mechanism: cosine heatmap and per-channel Key energy" loading="lazy"></div>
         <figcaption><strong>Figure 7.</strong> (a) Per-channel cos(&theta;<sub>c</sub>&middot;&Delta;): high-freq channels (top) decay rapidly; low-freq "Safe Harbor" channels (bottom) stay near 1. (b) Per-channel Key energy: sink keys (pink) concentrate in low-freq; normal keys (gray) spread uniformly.</figcaption>
       </figure>
       <figure class="finding-fig">
-        <img src="assets/figures/fig_same_norm_diff_dist.png" alt="2x3 heatmap showing FAC deepening across layers and near-zero sink Values" loading="lazy">
+        <div class="fig-img-wrap"><img src="assets/figures/fig_same_norm_diff_dist.png" alt="2x3 heatmap showing FAC deepening across layers and near-zero sink Values" loading="lazy"></div>
         <figcaption><strong>Figure 8.</strong> FAC deepens with layer depth. Top row: Sink Key energy shifts to low-freq channels; attention gap grows to &gt;200&times;. Bottom row: Sink Value channels go to near-zero — sinks absorb attention without adding signal ("no-op" targets).</figcaption>
       </figure>
       <div class="insight-box">Sink keys survive by placing energy in "Safe Harbor" channels where rotation barely changes. They win by surviving, not by dominating.</div>
@@ -607,7 +602,7 @@ code {
           <figcaption><strong>Figure 9a.</strong> FLUX.1 (RoPE): semantically empty tokens attract far more attention. Same positions, same seed — only token content changes.</figcaption>
         </figure>
         <figure class="finding-fig">
-          <img src="assets/figures/fig_ape_sink_control_v2.png" alt="PixArt PE manipulation — smiley face pattern in attention" loading="lazy">
+          <div class="fig-img-wrap"><img src="assets/figures/fig_ape_sink_control_v2.png" alt="PixArt PE manipulation — smiley face pattern in attention" loading="lazy"></div>
           <figcaption><strong>Figure 9b.</strong> PixArt (AbsPE): copying the corner PE to a smiley-face pattern redirects attention. The positional embedding alone controls which tokens become sinks.</figcaption>
         </figure>
       </div>
@@ -627,7 +622,7 @@ code {
     </div>
 
     <figure class="finding-fig fade-in">
-      <img src="assets/figures/puppy_attention_budget.png" alt="Attention budget of FLUX.1 — top-32 tokens ranked by Key Importance" loading="lazy">
+      <div class="fig-img-wrap"><img src="assets/figures/puppy_attention_budget.png" alt="Attention budget of FLUX.1 — top-32 tokens ranked by Key Importance" loading="lazy"></div>
       <figcaption><strong>Figure 10.</strong> Attention budget of FLUX.1: Top-32 tokens ranked by mean &mu;<sub>k</sub> (N=100 prompts). <span style="color:var(--accent);font-weight:600;">&lt;EOS&gt;</span> dominates; 22 of 32 are <strong>&lt;PAD&gt;</strong>. Empty tokens absorb 55% of total attention; image tokens (89% of sequence) get only 22%.</figcaption>
     </figure>
 
