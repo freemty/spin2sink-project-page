@@ -102,7 +102,7 @@ section { padding: 48px 0; scroll-margin-top: 60px; }
 .hero h1 {
   font-family: var(--font-display); font-size: 34px; font-weight: 400;
   line-height: 1.25; letter-spacing: -0.01em; color: var(--text);
-  max-width: 760px; margin: 0 auto 16px;
+  margin: 0 auto 16px;
 }
 .hero-venue {
   display: inline-block; font-size: 13px; font-weight: 700;
@@ -146,12 +146,62 @@ section { padding: 48px 0; scroll-margin-top: 60px; }
 
 /* ===== TEASER ===== */
 .teaser { padding: 32px 0; }
-.teaser-img {
-  border: 1px solid var(--border); border-radius: 4px; overflow: hidden;
-  margin-bottom: 12px;
+.teaser-controls {
+  display: flex; gap: 24px; align-items: center; justify-content: center;
+  margin-bottom: 16px; flex-wrap: wrap;
 }
-.teaser-img img { width: 100%; }
-.teaser-img .fig-img-wrap { background: #0A0A0A; padding: 8px; }
+.teaser-control-group { display: flex; align-items: center; gap: 8px; }
+.teaser-control-group label {
+  font-size: 11px; font-weight: 600; text-transform: uppercase;
+  letter-spacing: 0.05em; color: var(--text-tertiary);
+}
+.teaser-pills {
+  display: flex; gap: 2px; background: var(--border-light); border-radius: 4px;
+  padding: 2px;
+}
+.teaser-pill {
+  font-family: var(--font-mono); font-size: 12px; font-weight: 500;
+  padding: 4px 12px; border: none; border-radius: 3px; cursor: pointer;
+  background: transparent; color: var(--text-tertiary);
+  transition: all var(--transition);
+}
+.teaser-pill:hover { color: var(--text); }
+.teaser-pill.active {
+  background: var(--bg); color: var(--text); box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+}
+[data-theme="dark"] .teaser-pill.active { background: #222; }
+.teaser-grid {
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 3px;
+  background: #000; border-radius: 4px; overflow: hidden; margin-bottom: 12px;
+}
+.teaser-cell { position: relative; aspect-ratio: 1; overflow: hidden; cursor: pointer; }
+.teaser-cell img {
+  width: 100%; height: 100%; object-fit: cover;
+  transition: transform 0.3s ease;
+}
+.teaser-cell:hover img { transform: scale(1.05); }
+.teaser-cell-label {
+  position: absolute; bottom: 0; left: 0; right: 0;
+  padding: 4px 8px; font-size: 10px; font-weight: 600;
+  color: #ccc; background: linear-gradient(transparent, rgba(0,0,0,0.8));
+  letter-spacing: 0.03em;
+}
+.teaser-cell-label span { color: #fff; }
+.teaser-zoom {
+  position: fixed; top: 0; left: 0; right: 0; bottom: 0; z-index: 200;
+  background: rgba(0,0,0,0.92); display: none; align-items: center;
+  justify-content: center; cursor: zoom-out;
+  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+}
+.teaser-zoom.open { display: flex; }
+.teaser-zoom img {
+  max-width: 90vw; max-height: 85vh; border-radius: 4px;
+}
+.teaser-zoom-label {
+  position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
+  font-size: 14px; font-weight: 500; color: #aaa;
+  font-family: var(--font-mono);
+}
 .teaser-caption {
   font-size: 13px; color: var(--text-tertiary); line-height: 1.6; text-align: center;
 }
@@ -209,7 +259,7 @@ code {
 .finding-body { font-size: 14px; line-height: 1.8; color: var(--text-secondary); margin-bottom: 20px; }
 .finding-body strong { color: var(--text); font-weight: 600; }
 .finding-fig {
-  margin: 20px 0; border: 1px solid var(--border); border-radius: 4px;
+  margin: 20px 0; border-radius: 4px;
   overflow: hidden; background: var(--bg-card);
 }
 .finding-fig img {
@@ -353,7 +403,7 @@ code {
 <!-- ===== NAV ===== -->
 <nav class="nav" id="nav">
   <div class="nav-inner">
-    <a class="nav-brand" href="#">Spiral<span>→</span>Sink</a>
+    <a class="nav-brand" href="#"><span style="font-family:var(--font-display);font-weight:600">Y</span><span>.</span></a>
     <div class="nav-links">
       <a href="#abstract">Abstract</a>
       <a href="#findings">Findings</a>
@@ -368,14 +418,15 @@ code {
 <section class="hero">
   <div class="container">
     <h1 class="fade-in">From a Spiral to a Sink: How Positional Encoding Shapes Attention Sinks in Diffusion Transformers</h1>
-    <div class="hero-venue fade-in">NeurIPS 2026</div>
+    <div class="hero-venue fade-in">Under Submission</div>
     <div class="hero-authors fade-in">
       <span class="me">Yuanbo Yang</span><sup>1</sup>,
-      <a href="#">Yiyi Liao</a><sup>1†</sup>,
+      Jiahao Wang<sup>1</sup>,
+      <a href="#">Yiyi Liao</a><sup>1*</sup>,
       <a href="#">Jun Gao</a><sup>2</sup>
     </div>
     <div class="hero-affil fade-in">
-      <sup>1</sup>Zhejiang University &nbsp;&nbsp; <sup>2</sup>University of Toronto &nbsp;&nbsp; <sup>†</sup>Corresponding author
+      <sup>1</sup>Zhejiang University &nbsp;&nbsp; <sup>2</sup>University of Michigan &nbsp;&nbsp; <sup>*</sup>Corresponding author
     </div>
     <div class="hero-links fade-in">
       <a href="#" onclick="return false;" style="opacity:0.5;cursor:default;" title="Coming soon" aria-disabled="true" tabindex="-1">
@@ -397,12 +448,23 @@ code {
 <!-- ===== TEASER ===== -->
 <section class="teaser" id="teaser">
   <div class="container">
-    <figure class="teaser-img fade-in">
-      <div class="fig-img-wrap"><img src="assets/figures/teaser_2x2.png" alt="Attention heatmaps from FLUX.1 showing sink tokens as bright vertical columns" fetchpriority="high"></div>
-    </figure>
+    <div class="teaser-controls fade-in">
+      <div class="teaser-control-group">
+        <label>Step</label>
+        <div class="teaser-pills" id="step-pills"></div>
+      </div>
+    </div>
+
+    <div class="teaser-grid fade-in" id="teaser-grid"></div>
+
     <p class="teaser-caption fade-in">
-      <strong>Figure 1.</strong> Attention maps from FLUX.1 at different layers and denoising steps. Bright vertical columns indicate <em>attention sinks</em> — tokens that monopolize attention regardless of content. These sinks appear in the deeper layers and persist throughout generation.
+      <strong>Interactive.</strong> Attention maps from four DiTs at the selected denoising step. Bright vertical columns = <em>attention sinks</em>. Click any cell to zoom. Toggle denoising step to watch sinks emerge and intensify in deeper layers.
     </p>
+
+    <div class="teaser-zoom" id="teaser-zoom" onclick="this.classList.remove('open')">
+      <img id="teaser-zoom-img" src="" alt="Zoomed attention map">
+      <div class="teaser-zoom-label" id="teaser-zoom-label"></div>
+    </div>
   </div>
 </section>
 
@@ -749,7 +811,7 @@ code {
 <pre id="bibtex-text">@inproceedings{yang2026spiral2sink,
   title     = {From a Spiral to a Sink: How Positional Encoding
                Shapes Attention Sinks in Diffusion Transformers},
-  author    = {Yang, Yuanbo and Liao, Yiyi and Gao, Jun},
+  author    = {Yang, Yuanbo and Wang, Jiahao and Liao, Yiyi and Gao, Jun},
   booktitle = {Advances in Neural Information Processing Systems (NeurIPS)},
   year      = {2026}
 }</pre>
@@ -763,7 +825,7 @@ code {
     <p>
       <span style="font-family:var(--font-display);font-size:16px;font-weight:500;">Y<span style="color:var(--accent);">.</span></span>
       &nbsp;&middot;&nbsp;
-      Yuanbo Yang &middot; Zhejiang University &middot; University of Toronto
+      Yuanbo Yang &middot; Zhejiang University
     </p>
   </div>
 </footer>
@@ -777,6 +839,69 @@ function toggleTheme() {
   localStorage.setItem('theme', next);
 }
 // Theme init moved to <head> to prevent FOUC
+
+// Interactive teaser
+const teaserData = {
+  flux:   { label: 'FLUX.1',    layers: [28, 38], steps: [14, 27], totalSteps: 50, totalLayers: 57 },
+  pixart: { label: 'PixArt-α',  layers: [18, 20], steps: [10, 19], totalSteps: 20, totalLayers: 28 },
+  wan21:  { label: 'Wan2.1',    layers: [18, 22], steps: [25, 49], totalSteps: 50, totalLayers: 40 },
+  ltx:    { label: 'LTX-Video', layers: [14, 16], steps: [25, 49], totalSteps: 50, totalLayers: 28 }
+};
+const modelOrder = ['pixart', 'flux', 'wan21', 'ltx'];
+let currentStepIdx = 1;
+
+function teaserPath(model, stepIdx, layerIdx) {
+  const d = teaserData[model];
+  return `assets/figures/teaser/${model}_step${String(d.steps[stepIdx]).padStart(2,'0')}_layer${d.layers[layerIdx]}.jpg`;
+}
+
+function buildStepPills() {
+  const c = document.getElementById('step-pills');
+  ['Early', 'Late'].forEach((label, i) => {
+    const btn = document.createElement('button');
+    btn.className = 'teaser-pill' + (i === currentStepIdx ? ' active' : '');
+    btn.textContent = label;
+    btn.onclick = () => { currentStepIdx = i; updateTeaser(); };
+    c.appendChild(btn);
+  });
+}
+
+function updateTeaser() {
+  document.querySelectorAll('#step-pills .teaser-pill').forEach((p, i) => {
+    p.classList.toggle('active', i === currentStepIdx);
+  });
+  const grid = document.getElementById('teaser-grid');
+  grid.innerHTML = '';
+  modelOrder.forEach(model => {
+    const d = teaserData[model];
+    d.layers.forEach((layer, li) => {
+      const cell = document.createElement('div');
+      cell.className = 'teaser-cell';
+      const stepPct = Math.round(d.steps[currentStepIdx] / d.totalSteps * 100);
+      const depthPct = Math.round(layer / d.totalLayers * 100);
+      const img = document.createElement('img');
+      img.src = teaserPath(model, currentStepIdx, li);
+      img.alt = `${d.label} Step ${d.steps[currentStepIdx]} Layer ${layer}`;
+      img.loading = li === 0 && currentStepIdx === 1 ? 'eager' : 'lazy';
+      cell.appendChild(img);
+      const lbl = document.createElement('div');
+      lbl.className = 'teaser-cell-label';
+      lbl.innerHTML = li === 0
+        ? `<span>${d.label}</span> · L${layer} (${depthPct}%)`
+        : `L${layer} (${depthPct}%)`;
+      cell.appendChild(lbl);
+      cell.onclick = () => {
+        document.getElementById('teaser-zoom-img').src = img.src;
+        document.getElementById('teaser-zoom-label').textContent = `${d.label} — Step ${stepPct}%, Layer ${layer} (depth ${depthPct}%)`;
+        document.getElementById('teaser-zoom').classList.add('open');
+      };
+      grid.appendChild(cell);
+    });
+  });
+}
+
+buildStepPills();
+updateTeaser();
 
 // Nav scroll effect
 const nav = document.getElementById('nav');
